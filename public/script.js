@@ -56,8 +56,17 @@ function callUser() {
     audio.srcObject = e.streams[0];
     audio.play();
 
-    // Start recording the incoming audio stream
-    mediaRecorder = new MediaRecorder(e.streams[0]);
+    // Create a new MediaStream to combine local and remote audio
+    const combinedStream = new MediaStream();
+
+    // Add remote audio track
+    combinedStream.addTrack(e.track);
+
+    // Add local audio tracks
+    localStream.getTracks().forEach((track) => combinedStream.addTrack(track));
+
+    // Start recording the combined audio stream
+    mediaRecorder = new MediaRecorder(combinedStream);
     mediaRecorder.start();
 
     mediaRecorder.ondataavailable = (event) => {
@@ -104,8 +113,17 @@ socket.on("call-user", (data) => {
     audio.srcObject = e.streams[0];
     audio.play();
 
-    // Start recording the incoming audio stream
-    mediaRecorder = new MediaRecorder(e.streams[0]);
+    // Create a new MediaStream to combine local and remote audio
+    const combinedStream = new MediaStream();
+
+    // Add remote audio track
+    combinedStream.addTrack(e.track);
+
+    // Add local audio tracks
+    localStream.getTracks().forEach((track) => combinedStream.addTrack(track));
+
+    // Start recording the combined audio stream
+    mediaRecorder = new MediaRecorder(combinedStream);
     mediaRecorder.start();
 
     mediaRecorder.ondataavailable = (event) => {
