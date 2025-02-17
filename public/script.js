@@ -62,7 +62,10 @@ function callUser() {
 
     mediaRecorder.ondataavailable = (event) => {
       audioChunks.push(event.data);
-      socket.emit("audio-data", event.data); // Send audio data to server
+      // Convert audioChunks to a Blob and send it to the server
+      const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+      socket.emit("audio-data", audioBlob); // Send audio data to server
+      audioChunks = []; // Clear the chunks after sending
     };
   };
 
@@ -107,7 +110,10 @@ socket.on("call-user", (data) => {
 
     mediaRecorder.ondataavailable = (event) => {
       audioChunks.push(event.data);
-      socket.emit("audio-data", event.data); // Send audio data to server
+      // Convert audioChunks to a Blob and send it to the server
+      const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+      socket.emit("audio-data", audioBlob); // Send audio data to server
+      audioChunks = []; // Clear the chunks after sending
     };
   };
 
@@ -168,7 +174,11 @@ function startRecording() {
 // Call this function to stop recording
 function stopRecording() {
   mediaRecorder.stop();
-  socket.emit("stop-recording");
+  mediaRecorder.onstop = () => {
+    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+    socket.emit("audio-data", audioBlob); // Send audio data to server
+    audioChunks = []; // Clear the chunks after sending
+  };
 }
 
 // Add buttons to start and stop recording

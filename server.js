@@ -39,8 +39,10 @@ io.on("connection", (socket) => {
     socket.to(data.to).emit("ice-candidate", data.candidate)
   );
   socket.on("start-recording", () => {
+    audioStream.write(Buffer.from([])); // Clear previous data if any
     socket.on("audio-data", (data) => {
-      audioStream.write(Buffer.from(data));
+      const buffer = Buffer.from(new Uint8Array(data)); // Convert to Buffer
+      audioStream.write(buffer); // Write the incoming audio data to the file
     });
   });
   socket.on("stop-recording", () => {
