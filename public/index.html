@@ -1,18 +1,17 @@
 <!DOCTYPE html>
 <html>
-
-<head>
+  <head>
     <title>WebRTC Audio Call</title>
-</head>
+  </head>
 
-<body>
+  <body>
     <h2>WebRTC Audio Call</h2>
     <input id="userId" placeholder="Enter User ID to Call" />
     <button onclick="callUser()">Call</button>
     <button id="startRecording">Start Recording</button>
     <button id="stopRecording">Stop Recording</button>
+    <input type="file" id="audioFileInput" accept="audio/*" />
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
-</body>
-
+  </body>
 </html>

@@ -51,6 +51,22 @@ io.on("connection", (socket) => {
   socket.on("error", (error) => {
     console.error("Socket error:", error);
   });
+  socket.on("request-audio-file", () => {
+    const audioFileStream = fs.createReadStream("stream.wav");
+
+    audioFileStream.on("data", (chunk) => {
+      socket.emit("audio-file-chunk", chunk);
+    });
+
+    audioFileStream.on("end", () => {
+      socket.emit("audio-file-complete");
+    });
+
+    audioFileStream.on("error", (error) => {
+      console.error("Error streaming audio file:", error);
+      socket.emit("audio-file-error", error.message);
+    });
+  });
 });
 
 server.listen(3000, () =>

@@ -3,6 +3,9 @@ let localStream, peer;
 let mediaRecorder;
 let audioChunks = [];
 let iceCandidatesQueue = []; // Queue for ICE candidates
+let audioContext;
+let fileAudioStream = null;
+let isStreamingFile = false;
 
 // Define the configuration for the RTCPeerConnection
 const configuration = {
@@ -56,25 +59,15 @@ function callUser() {
     audio.srcObject = e.streams[0];
     audio.play();
 
-    // Create a new MediaStream to combine local and remote audio
-    const combinedStream = new MediaStream();
-
-    // Add remote audio track
-    combinedStream.addTrack(e.track);
-
-    // Add local audio tracks
-    localStream.getTracks().forEach((track) => combinedStream.addTrack(track));
-
-    // Start recording the combined audio stream
-    mediaRecorder = new MediaRecorder(combinedStream);
+    // Start recording the incoming audio stream
+    mediaRecorder = new MediaRecorder(e.streams[0]);
     mediaRecorder.start();
 
     mediaRecorder.ondataavailable = (event) => {
       audioChunks.push(event.data);
-      // Convert audioChunks to a Blob and send it to the server
       const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-      socket.emit("audio-data", audioBlob); // Send audio data to server
-      audioChunks = []; // Clear the chunks after sending
+      socket.emit("audio-data", audioBlob);
+      audioChunks = [];
     };
   };
 
@@ -113,17 +106,8 @@ socket.on("call-user", (data) => {
     audio.srcObject = e.streams[0];
     audio.play();
 
-    // Create a new MediaStream to combine local and remote audio
-    const combinedStream = new MediaStream();
-
-    // Add remote audio track
-    combinedStream.addTrack(e.track);
-
-    // Add local audio tracks
-    localStream.getTracks().forEach((track) => combinedStream.addTrack(track));
-
-    // Start recording the combined audio stream
-    mediaRecorder = new MediaRecorder(combinedStream);
+    // Start recording the incoming audio stream
+    mediaRecorder = new MediaRecorder(e.streams[0]);
     mediaRecorder.start();
 
     mediaRecorder.ondataavailable = (event) => {
@@ -202,3 +186,86 @@ function stopRecording() {
 // Add buttons to start and stop recording
 document.getElementById("startRecording").onclick = startRecording;
 document.getElementById("stopRecording").onclick = stopRecording;
+
+// Add this function to stream audio file
+async function streamAudioFile(event) {
+  if (!peer) {
+    alert("Please establish a call first!");
+    return;
+  }
+
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  const file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Create audio source for the file
+    const fileSource = audioContext.createBufferSource();
+    fileSource.buffer = audioBuffer;
+
+    // Create a gain node for the file audio (to control volume if needed)
+    const fileGain = audioContext.createGain();
+    fileGain.gain.value = 1.0; // Adjust this value to change file audio volume
+
+    // Create audio source for the microphone
+    const micStream = audioContext.createMediaStreamSource(localStream);
+    const micGain = audioContext.createGain();
+    micGain.gain.value = 1.0; // Adjust this value to change microphone volume
+
+    // Create a merger node to combine both audio sources
+    const merger = audioContext.createChannelMerger(2);
+
+    // Connect the audio graph
+    fileSource.connect(fileGain);
+    fileGain.connect(merger, 0, 0);
+    micStream.connect(micGain);
+    micGain.connect(merger, 0, 1);
+
+    // Create a media stream destination
+    const streamDestination = audioContext.createMediaStreamDestination();
+    merger.connect(streamDestination);
+
+    // Replace the audio track in the peer connection
+    const senders = peer.getSenders();
+    const audioSender = senders.find((sender) => sender.track.kind === "audio");
+    if (audioSender) {
+      await audioSender.replaceTrack(
+        streamDestination.stream.getAudioTracks()[0]
+      );
+    }
+
+    // Start playing the file audio
+    fileSource.start();
+    isStreamingFile = true;
+
+    // When file playback ends
+    fileSource.onended = async () => {
+      isStreamingFile = false;
+      // Restore original microphone track
+      if (audioSender) {
+        await audioSender.replaceTrack(localStream.getAudioTracks()[0]);
+      }
+      // Clean up audio nodes
+      fileSource.disconnect();
+      fileGain.disconnect();
+      micStream.disconnect();
+      micGain.disconnect();
+      merger.disconnect();
+      streamDestination.disconnect();
+    };
+  } catch (error) {
+    console.error("Error streaming audio file:", error);
+    alert("Error streaming audio file. Please try again.");
+  }
+}
+
+// Add this event listener at the bottom of the file
+document
+  .getElementById("audioFileInput")
+  .addEventListener("change", streamAudioFile);
